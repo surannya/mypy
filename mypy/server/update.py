@@ -140,9 +140,11 @@ from mypy.server.deps import get_dependencies, get_dependencies_of_target
 from mypy.server.target import module_prefix, split_target
 from mypy.server.trigger import make_trigger
 
+import mypy.types
+
 
 # If True, print out debug logging output.
-DEBUG = False
+DEBUG = True
 
 
 MAX_ITER = 1000
@@ -192,6 +194,7 @@ class FineGrainedBuildManager:
             A list of errors.
         """
         assert changed_modules, 'No changed modules'
+        # import pdb; pdb.set_trace()
 
         # Reset global caches for the new build.
         find_module_clear_caches()
@@ -223,7 +226,8 @@ class FineGrainedBuildManager:
             messages, remaining, (next_id, next_path), blocker = result
             changed_modules = [(id, path) for id, path in changed_modules
                                if id != next_id]
-            changed_modules = dedupe_modules(changed_modules + remaining)
+            #changed_modules = dedupe_modules(changed_modules + remaining)
+            changed_modules = dedupe_modules(remaining + changed_modules)
             if blocker:
                 self.blocking_error = (next_id, next_path)
                 self.stale = changed_modules
@@ -250,6 +254,8 @@ class FineGrainedBuildManager:
         """
         if DEBUG:
             print('--- update single %r ---' % module)
+            print('existing modules:', list(self.manager.modules.keys()))
+            print('previous modules:', list(self.previous_modules.keys()))
 
         # TODO: If new module brings in other modules, we parse some files multiple times.
         manager = self.manager
@@ -263,6 +269,7 @@ class FineGrainedBuildManager:
 
         manager.errors.reset()
         result = update_single_isolated(module, path, manager, previous_modules)
+        #import pdb; pdb.set_trace()
         if isinstance(result, BlockedUpdate):
             # Blocking error -- just give up
             module, path, remaining, errors = result
@@ -277,12 +284,14 @@ class FineGrainedBuildManager:
             filtered = [trigger for trigger in triggered
                         if not trigger.endswith('__>')]
             print('triggered:', sorted(filtered))
+            print('existing modules:', list(self.manager.modules.keys()))
         self.triggered.extend(triggered | self.previous_targets_with_errors)
         update_dependencies({module: tree}, self.deps, graph, self.options)
         propagate_changes_using_dependencies(manager, graph, self.deps, triggered,
                                              {module},
                                              self.previous_targets_with_errors,
-                                             graph)
+                                             self.manager.modules)
+#                                             graph)
 
         # Preserve state needed for the next update.
         self.previous_targets_with_errors = manager.errors.targets()
@@ -290,6 +299,7 @@ class FineGrainedBuildManager:
         if module in graph:
             # Generate metadata so that we can reuse the AST in the next run.
             graph[module].write_cache()
+        # XXX: I am super skeptical of this!
         for id, state in graph.items():
             # Look up missing ASTs from saved cache.
             if state.tree is None and id in manager.saved_cache:
@@ -364,6 +374,7 @@ def update_single_isolated(module: str,
 
     Returns a named tuple describing the result (see above for details).
     """
+    #import pdb; pdb.set_trace()
     if module in manager.modules:
         assert_equivalent_paths(path, manager.modules[module].path)
     elif DEBUG:
@@ -376,6 +387,7 @@ def update_single_isolated(module: str,
     manager.missing_modules = set()
     try:
         graph = load_graph(sources, manager)
+        #print("sources/graph:", sources, graph)
     except CompileError as err:
         # Parse error somewhere in the program -- a blocker
         assert err.module_with_blocker
@@ -384,6 +396,7 @@ def update_single_isolated(module: str,
             # since it will be stale.
             #
             # TODO: It would be more efficient to store the original target module
+            #print('asdf!')
             path = manager.modules[module].path
             del manager.modules[module]
             remaining_modules = [(module, path)]
@@ -397,6 +410,7 @@ def update_single_isolated(module: str,
 
     # Find any other modules brought in by imports.
     changed_modules = get_all_changed_modules(module, path, previous_modules, graph)
+    #print('changed:', changed_modules)
     # If there are multiple modules to process, only process one of them and return
     # the remaining ones to the caller.
     if len(changed_modules) > 1:
@@ -406,7 +420,13 @@ def update_single_isolated(module: str,
         remaining_modules = changed_modules
         # The remaining modules haven't been processed yet so drop them.
         for id, _ in remaining_modules:
-            del manager.modules[id]
+            #print('deleting!', id)
+            # EW
+            if id in old_modules:
+                #print('no, restoring!')
+                manager.modules[id] = old_modules[id]
+            else:
+                del manager.modules[id]
             del graph[id]
         if DEBUG:
             print('--> %r (newly imported)' % module)
@@ -734,7 +754,7 @@ def propagate_changes_using_dependencies(
                 if id not in todo:
                     todo[id] = set()
                 if DEBUG:
-                    print('process', target)
+                    print('process', target, id)
                 todo[id].update(lookup_target(manager.modules, target))
         triggered = set()
         # TODO: Preserve order (set is not optimal)
@@ -784,7 +804,7 @@ def find_targets_recursive(
                 if module_id not in result:
                     result[module_id] = set()
                 if DEBUG:
-                    print('process', target)
+                    print('process', target, module_id, set(modules.keys()))
                 deferred = lookup_target(modules, target)
                 result[module_id].update(deferred)
 

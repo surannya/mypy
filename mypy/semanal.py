@@ -394,6 +394,8 @@ class SemanticAnalyzerPass2(NodeVisitor[None], SemanticAnalyzerPluginInterface):
             else:
                 # Top-level function
                 if not defn.is_decorated and not defn.is_overload:
+                    if defn.name() not in self.globals:
+                        import pdb; pdb.set_trace()
                     symbol = self.globals[defn.name()]
                     if isinstance(symbol.node, FuncDef) and symbol.node != defn:
                         # This is redefinition. Conditional redefinition is okay.

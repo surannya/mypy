@@ -1563,3 +1563,128 @@ class C:
 ==
 main:5: error: Too few arguments for "__init__" of "C"
 main:6: error: Too few arguments for "D"
+
+[case testStuff_python2]
+import what.b
+
+[file z.py]
+from typing import Type, TypeVar
+class A: pass
+class B(A): pass
+T = TypeVar('T', bound=A)
+def foo(x, # type: Type[T]
+        y, # type: Type[T]
+        z, # type: T
+): # type: (...) -> None
+    pass
+[file z.py.2]
+import config
+from typing import Type, TypeVar
+class A: pass
+class B(A): pass
+T = TypeVar('T', bound=A)
+def foo(y, # type: Type[T]
+        z, # type: T
+): # type: (...) -> None
+    pass
+
+[file what/__init__.py]
+[file what/__init__.py.2]
+# type: ignore  # Necessary to make this file mypy-typed
+[file what/b.py]
+import z
+def main(): # type: () -> None
+    z.foo(z.B, z.A, z.A())
+[file what/b.py.2]
+import z
+def main(): # type: () -> None
+    z.foo(z.A, z.A())
+[file config.py]
+# type: ignore  # Necessary to make this file mypy-typed
+[file config.py.2]
+# type: ignore  # Necessary to make this file mypy-typed
+[out]
+==
+
+[case testStuff2_python2]
+import what.b
+
+[file zzz/__init__.py]
+[file zzz/z.py]
+def foo(x): # type: (int) -> None
+    pass
+[file zzz/z.py.2]
+import config
+def foo(): # type: () -> None
+    pass
+
+[file what/__init__.py]
+[file what/b.py]
+import zzz.z
+def main(): # type: () -> None
+    zzz.z.foo(5)
+[file what/b.py.2]
+import zzz.z
+def main(): # type: () -> None
+    zzz.z.foo()
+[file config.py]
+# type: ignore  # Necessary to make this file mypy-typed
+[out]
+==
+
+[case testStuff3]
+import what.b
+
+[file aaa/__init__.py]
+[file aaa/z.py]
+def foo(x: int) -> None:
+    pass
+[file aaa/z.py.2]
+import config
+def foo() -> None:
+    pass
+def bar() -> None:
+    pass
+
+
+[file what/__init__.py]
+[file what/b.py]
+import aaa.z
+def main() -> None:
+    aaa.z.foo(5)
+#    aaa.z.bar
+[file what/b.py.2]
+import aaa.z
+def main() -> None:
+    aaa.z.foo()
+[file config.py]
+[out]
+==
+
+[case testStuff4]
+import what.b
+
+[file aaa/__init__.py]
+[file aaa/z.py]
+def foo(x: int) -> None:
+    pass
+[file aaa/z.py.2]
+def foo() -> None:
+    pass
+def bar() -> None:
+    pass
+
+
+[file what/__init__.py]
+[file what/b.py]
+import aaa.z
+def main() -> None:
+    aaa.z.foo(5)
+[file what/b.py.2]
+import config
+import aaa.z
+def main() -> None:
+    aaa.z.foo()
+[file config.py]
+[out]
+==
