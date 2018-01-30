@@ -163,8 +163,14 @@ Lvalue = Expression
 class SymbolNode(Node):
     # Nodes that can be stored in a symbol table.
 
-    # TODO do not use methods for these
+    # This is a frumious hack!
+    # (... even more frumious, it doesn't seem to matter?)
+    def __hash__(self) -> int:
+        return id(self.__dict__)
+    def __eq__(self, rhs: object) -> bool:
+        return rhs is not None and self.__dict__ is rhs.__dict__
 
+    # TODO do not use methods for these
     @abstractmethod
     def name(self) -> str: pass
 

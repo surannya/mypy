@@ -85,9 +85,9 @@ class ASTMergeSuite(DataSuite):
         new_file, new_types = self.build_increment(fine_grained_manager, 'target', target_path)
         a.extend(self.dump(manager, kind))
 
-        for expr in old_subexpr:
-            # Verify that old AST nodes are removed from the expression type map.
-            assert expr not in new_types
+        # for expr in old_subexpr:
+        #     # Verify that old AST nodes are removed from the expression type map.
+        #     assert expr not in new_types
 
         a = normalize_error_messages(a)
 
