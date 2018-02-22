@@ -14,7 +14,7 @@ import shutil
 from typing import List, Tuple, Dict, Optional, Set
 
 from mypy import build
-from mypy.build import BuildManager, BuildSource, Graph
+from mypy.build import BuildManager, BuildSource, BuildResult, Graph
 from mypy.errors import Errors, CompileError
 from mypy.nodes import Node, MypyFile, SymbolTable, SymbolTableNode, TypeInfo, Expression
 from mypy.options import Options
@@ -70,16 +70,17 @@ class FineGrainedSuite(DataSuite):
 
         main_src = '\n'.join(testcase.input)
         sources_override = self.parse_sources(main_src)
-        messages, manager, graph = self.build(main_src, testcase, sources_override,
-                                              build_cache=self.use_cache,
-                                              enable_cache=self.use_cache)
+        result = self.build(main_src, testcase, sources_override,
+                            build_cache=self.use_cache,
+                            enable_cache=self.use_cache)
+        messages = result.errors
         a = []
         if messages:
             a.extend(normalize_messages(messages))
 
         fine_grained_manager = None
         if not self.use_cache:
-            fine_grained_manager = FineGrainedBuildManager(manager, graph)
+            fine_grained_manager = FineGrainedBuildManager(result)
 
         steps = testcase.find_steps()
         all_triggered = []
@@ -102,9 +103,9 @@ class FineGrainedSuite(DataSuite):
             # If this is the second iteration and we are using a
             # cache, now we need to set it up
             if fine_grained_manager is None:
-                messages, manager, graph = self.build(main_src, testcase, sources_override,
-                                                      build_cache=False, enable_cache=True)
-                fine_grained_manager = FineGrainedBuildManager(manager, graph)
+                result = self.build(main_src, testcase, sources_override,
+                                    build_cache=False, enable_cache=True)
+                fine_grained_manager = FineGrainedBuildManager(result)
 
             new_messages = fine_grained_manager.update(modules)
             all_triggered.append(fine_grained_manager.triggered)
@@ -133,7 +134,7 @@ class FineGrainedSuite(DataSuite):
               testcase: DataDrivenTestCase,
               sources_override: Optional[List[Tuple[str, str]]],
               build_cache: bool,
-              enable_cache: bool) -> Tuple[List[str], BuildManager, Graph]:
+              enable_cache: bool) -> BuildResult:
         # This handles things like '# flags: --foo'.
         options = parse_options(source, testcase, incremental_step=1)
         options.incremental = True
@@ -160,7 +161,7 @@ class FineGrainedSuite(DataSuite):
             # TODO: We need a manager and a graph in this case as well
             assert False, str('\n'.join(e.messages))
             return e.messages, None, None
-        return result.errors, result.manager, result.graph
+        return result
 
     def format_triggered(self, triggered: List[List[str]]) -> List[str]:
         result = []
